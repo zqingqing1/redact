@@ -9,17 +9,17 @@ const (
 	tagName = "redact"
 )
 
-type sanitizer func(string) string
+type redactor func(string) string
 
-var sanitizers = map[string]sanitizer{}
+var redactors = map[string]redactor{}
 
-// AddSanitizer associates a sanitizer with a key, which can be used in a Struct tag
-func AddSanitizer(key string, s sanitizer) {
-	sanitizers[key] = s
+// AddRedactor allows for adding custom functionality based on tag values
+func AddRedactor(key string, r redactor) {
+	redactors[key] = r
 }
 
-// Strings conforms strings based on reflection tags
-func Strings(iface interface{}) error {
+// Redact redacts all strings without the nonsecret tag
+func Redact(iface interface{}) error {
 	ifv := reflect.ValueOf(iface)
 	if ifv.Kind() != reflect.Ptr {
 		return errors.New("Not a pointer")
@@ -40,9 +40,9 @@ func Strings(iface interface{}) error {
 				str := ""
 				if (elType.ConvertibleTo(reflect.TypeOf(str)) && reflect.TypeOf(str).ConvertibleTo(elType)) ||
 					(elType.ConvertibleTo(reflect.TypeOf(&str)) && reflect.TypeOf(&str).ConvertibleTo(elType)) {
-					tags := v.Tag.Get(tagName)
+					tagVal := v.Tag.Get(tagName)
 					for i := 0; i < el.Len(); i++ {
-						el.Index(i).Set(transformValue(tags, el.Index(i)))
+						el.Index(i).Set(transformValue(tagVal, el.Index(i)))
 					}
 				} else {
 					val := reflect.ValueOf(el.Interface())
@@ -51,7 +51,7 @@ func Strings(iface interface{}) error {
 						if elVal.Kind() != reflect.Ptr {
 							elVal = elVal.Addr()
 						}
-						Strings(elVal.Interface())
+						Redact(elVal.Interface())
 					}
 				}
 			}
@@ -63,27 +63,20 @@ func Strings(iface interface{}) error {
 					mapValuePtr := reflect.New(mapValue.Type())
 					mapValuePtr.Elem().Set(mapValue)
 					if mapValuePtr.Elem().CanAddr() {
-						Strings(mapValuePtr.Elem().Addr().Interface())
+						Redact(mapValuePtr.Elem().Addr().Interface())
 					}
 					val.SetMapIndex(key, reflect.Indirect(mapValuePtr))
 				}
 			}
 		case reflect.Struct:
 			if el.CanAddr() && el.Addr().CanInterface() {
-				// To handle "sql.NullString" we can assume that tags are added to a field of type struct rather than string
-				if tags := v.Tag.Get(tagName); tags != "" && el.CanSet() {
-					field := el.FieldByName("String")
-					str := field.String()
-					field.SetString(transformString(str, tags))
-				} else {
-					Strings(el.Addr().Interface())
-				}
+				Redact(el.Addr().Interface())
 			}
 		case reflect.String:
 			if el.CanSet() {
-				tags := v.Tag.Get(tagName)
+				tagVal := v.Tag.Get(tagName)
 				input := el.String()
-				el.SetString(transformString(input, tags))
+				el.SetString(transformString(input, tagVal))
 			}
 		}
 	}
@@ -130,11 +123,11 @@ func transformString(input, tagVal string) string {
 	case "nonsecret":
 		return input
 	default:
-		s, ok := sanitizers[tagVal]
+		redactor, ok := redactors[tagVal]
 		if !ok {
 			return "REDACTED"
 		}
 
-		return s(input)
+		return redactor(input)
 	}
 }

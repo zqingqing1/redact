@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	tagName = "redact"
+	tagName        = "redact"
+	RedactStrConst = "REDACTED"
 )
 
 type redactor func(string) string
@@ -125,7 +126,7 @@ func transformString(input, tagVal string) string {
 	default:
 		redactor, ok := redactors[tagVal]
 		if !ok {
-			return "REDACTED"
+			return RedactStrConst
 		}
 
 		return redactor(input)

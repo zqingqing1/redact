@@ -25,6 +25,7 @@ func Redact(iface interface{}) error {
 	if ifv.Kind() != reflect.Ptr {
 		return errors.New("Not a pointer")
 	}
+
 	ift := reflect.Indirect(ifv).Type()
 	if ift.Kind() != reflect.Struct {
 		return nil
@@ -33,42 +34,6 @@ func Redact(iface interface{}) error {
 		v := ift.Field(i)
 		el := reflect.Indirect(ifv.Elem().FieldByName(v.Name))
 		switch el.Kind() {
-		case reflect.Slice:
-			if el.CanInterface() {
-				elType := getSliceElemType(v.Type)
-
-				// allow strings and string pointers
-				str := ""
-				if (elType.ConvertibleTo(reflect.TypeOf(str)) && reflect.TypeOf(str).ConvertibleTo(elType)) ||
-					(elType.ConvertibleTo(reflect.TypeOf(&str)) && reflect.TypeOf(&str).ConvertibleTo(elType)) {
-					tagVal := v.Tag.Get(tagName)
-					for i := 0; i < el.Len(); i++ {
-						el.Index(i).Set(transformValue(tagVal, el.Index(i)))
-					}
-				} else {
-					val := reflect.ValueOf(el.Interface())
-					for i := 0; i < val.Len(); i++ {
-						elVal := val.Index(i)
-						if elVal.Kind() != reflect.Ptr {
-							elVal = elVal.Addr()
-						}
-						Redact(elVal.Interface())
-					}
-				}
-			}
-		case reflect.Map:
-			if el.CanInterface() {
-				val := reflect.ValueOf(el.Interface())
-				for _, key := range val.MapKeys() {
-					mapValue := val.MapIndex(key)
-					mapValuePtr := reflect.New(mapValue.Type())
-					mapValuePtr.Elem().Set(mapValue)
-					if mapValuePtr.Elem().CanAddr() {
-						Redact(mapValuePtr.Elem().Addr().Interface())
-					}
-					val.SetMapIndex(key, reflect.Indirect(mapValuePtr))
-				}
-			}
 		case reflect.Struct:
 			if el.CanAddr() && el.Addr().CanInterface() {
 				Redact(el.Addr().Interface())
@@ -79,6 +44,72 @@ func Redact(iface interface{}) error {
 				input := el.String()
 				el.SetString(transformString(input, tagVal))
 			}
+		default:
+			tagVal := v.Tag.Get(tagName)
+			if el.CanAddr() && el.Addr().CanInterface() {
+				redactHelper(el.Addr().Interface(), tagVal)
+			}
+
+		}
+	}
+	return nil
+}
+
+func redactHelper(iface interface{}, tagVal string) error {
+	ifv := reflect.ValueOf(iface)
+	if ifv.Kind() != reflect.Ptr {
+		return errors.New("Not a pointer")
+	}
+
+	ifIndirectValue := reflect.Indirect(ifv)
+	switch ifIndirectValue.Kind() {
+	case reflect.Slice:
+		if ifIndirectValue.CanInterface() {
+			elType := getSliceElemType(ifIndirectValue.Type())
+
+			// allow strings and string pointers
+			str := ""
+			if (elType.ConvertibleTo(reflect.TypeOf(str)) && reflect.TypeOf(str).ConvertibleTo(elType)) ||
+				(elType.ConvertibleTo(reflect.TypeOf(&str)) && reflect.TypeOf(&str).ConvertibleTo(elType)) {
+				for i := 0; i < ifIndirectValue.Len(); i++ {
+					ifIndirectValue.Index(i).Set(transformValue(tagVal, ifIndirectValue.Index(i)))
+				}
+			} else {
+				val := reflect.ValueOf(ifIndirectValue.Interface())
+				for i := 0; i < val.Len(); i++ {
+					elVal := val.Index(i)
+					if elVal.Kind() != reflect.Ptr {
+						elVal = elVal.Addr()
+					}
+					redactHelper(elVal.Interface(), tagVal)
+				}
+			}
+		}
+	case reflect.Map:
+		if ifIndirectValue.CanInterface() {
+			val := reflect.ValueOf(ifIndirectValue.Interface())
+			for _, key := range val.MapKeys() {
+				mapValue := val.MapIndex(key)
+				mapValuePtr := reflect.New(mapValue.Type())
+				mapValuePtr.Elem().Set(mapValue)
+				if mapValuePtr.Elem().CanAddr() {
+					redactHelper(mapValuePtr.Elem().Addr().Interface(), tagVal)
+				}
+				val.SetMapIndex(key, reflect.Indirect(mapValuePtr))
+			}
+		}
+	case reflect.Struct:
+		if ifIndirectValue.CanAddr() && ifIndirectValue.Addr().CanInterface() {
+			Redact(ifIndirectValue.Addr().Interface())
+		}
+	case reflect.String:
+		if ifIndirectValue.CanSet() {
+			input := ifIndirectValue.String()
+			ifIndirectValue.SetString(transformString(input, tagVal))
+		}
+	case reflect.Ptr:
+		if ifIndirectValue.CanInterface() {
+			redactHelper(ifIndirectValue.Interface(), tagVal)
 		}
 	}
 	return nil

@@ -28,6 +28,10 @@ type TestStructList struct {
 	Data []*TestStruct
 }
 
+type TestStructEmbed struct {
+	data TestStruct `redact:"snapshot"`
+}
+
 type TestMaps struct {
 	NonSnapshotMap    map[string]string
 	NonSnapshotMapPtr map[string]*string
@@ -183,5 +187,28 @@ func TestStringTestMapAndEmbedded(t *testing.T) {
 		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].TestStructs["ptr-test-struct-key"].NonSnapshot, "should redact non snapshot value")
 		assert.Equal(t, redact.RedactStrConst, *testMapList.Data[0].TestStructs["ptr-test-struct-key"].NonSnapshotPtr, "should redact non snapshot value")
 		assert.Equal(t, snapshotVal, testMapList.Data[0].TestStructs["ptr-test-struct-key"].SnapshotStr, "should redact non snapshot value")
+	})
+}
+
+func TestStringTestStructAndEmbed(t *testing.T) {
+	t.Run("snapshot a struct, all of the value from the struct is snapshoted", func(t *testing.T) {
+		tStruct := TestStruct{
+			NonSnapshot:    nonSnapshotVal,
+			NonSnapshotPtr: &nonSnapshotPtrVal,
+			SnapshotStr:    snapshotVal,
+			SnapshotStrPtr: &snapshotPtrVal,
+		}
+
+		embed := &TestStructEmbed{
+			data: tStruct,
+		}
+
+		err := redact.Snapshot(embed)
+		assert.NoError(t, err, "should not fail to redact struct")
+
+		assert.Equal(t, snapshotVal, embed.data.SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, snapshotPtrVal, *embed.data.SnapshotStrPtr, "should contain snapshot value")
+		assert.Equal(t, nonSnapshotVal, embed.data.NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, nonSnapshotPtrVal, *embed.data.NonSnapshotPtr, "should redact non snapshot value")
 	})
 }

@@ -8,18 +8,20 @@ import (
 )
 
 const (
-	secretVal    = "thisIsASecret"
-	nonSecretVal = "thisIsAStandardVal"
+	snapshotVal    = "thisIsASnapShotVal"
+	nonSnapshotVal = "thisIsNotASnapshotVal"
 )
 
 var (
-	secretPtrVal = "thisIsAPtrSecret"
+	snapshotPtrVal    = "thisIsAPtrSnapshot"
+	nonSnapshotPtrVal = "thisIsNotPtrSnapshot"
 )
 
 type TestStruct struct {
-	Secret    string
-	SecretPtr *string
-	NonSecret string `redact:"nonsecret"`
+	NonSnapshot    string
+	NonSnapshotPtr *string
+	SnapshotStr    string  `redact:"snapshot"`
+	SnapshotStrPtr *string `redact:"snapshot"`
 }
 
 type TestStructList struct {
@@ -27,9 +29,9 @@ type TestStructList struct {
 }
 
 type TestMaps struct {
-	Secrets           map[string]string
-	SecretPtrs        map[string]*string
-	TestStructSecrets map[string]*TestStruct
+	NonSnapshotMap    map[string]string
+	NonSnapshotMapPtr map[string]*string
+	TestStructs       map[string]*TestStruct
 }
 
 type TestMapList struct {
@@ -37,127 +39,133 @@ type TestMapList struct {
 }
 
 func TestStringTestStruct(t *testing.T) {
-	t.Run("Basic Secret Redaction", func(t *testing.T) {
+	t.Run("Basic Snapshot Redaction", func(t *testing.T) {
 		tStruct := &TestStruct{
-			NonSecret: nonSecretVal,
-			Secret:    secretVal,
-			SecretPtr: &secretPtrVal,
+			NonSnapshot:    nonSnapshotVal,
+			NonSnapshotPtr: &nonSnapshotPtrVal,
+			SnapshotStr:    snapshotVal,
+			SnapshotStrPtr: &snapshotPtrVal,
 		}
 
-		err := redact.Redact(tStruct)
+		err := redact.Snapshot(tStruct)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, nonSecretVal, tStruct.NonSecret, "should contain non secret value")
-		assert.Equal(t, redact.RedactStrConst, tStruct.Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *tStruct.SecretPtr, "should redact secret value")
+		assert.Equal(t, snapshotVal, tStruct.SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, snapshotPtrVal, *tStruct.SnapshotStrPtr, "should contain snapshot value")
+		assert.Equal(t, redact.RedactStrConst, tStruct.NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *tStruct.NonSnapshotPtr, "should redact non snapshot pointer value")
 	})
 
-	t.Run("Should still redact empty strings", func(t *testing.T) {
+	t.Run("Should still redact empty non snapshot strings", func(t *testing.T) {
 		emptyStrVal := ""
 
 		tStruct := &TestStruct{
-			NonSecret: nonSecretVal,
-			Secret:    "",
-			SecretPtr: &emptyStrVal,
+			NonSnapshot:    "",
+			NonSnapshotPtr: &emptyStrVal,
+			SnapshotStr:    snapshotVal,
 		}
 
-		err := redact.Redact(tStruct)
+		err := redact.Snapshot(tStruct)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, nonSecretVal, tStruct.NonSecret, "should contain non secret value")
-		assert.Equal(t, redact.RedactStrConst, tStruct.Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *tStruct.SecretPtr, "should redact secret value")
+		assert.Equal(t, snapshotVal, tStruct.SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, redact.RedactStrConst, tStruct.NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *tStruct.NonSnapshotPtr, "should redact non snapshot value")
 	})
 
 }
 
 func TestStringTestStructList(t *testing.T) {
-	t.Run("Basic Secret Redaction", func(t *testing.T) {
+	t.Run("Basic Snapshot Redaction", func(t *testing.T) {
 		tStruct := &TestStruct{
-			NonSecret: nonSecretVal,
-			Secret:    secretVal,
-			SecretPtr: &secretPtrVal,
+			NonSnapshot:    nonSnapshotVal,
+			NonSnapshotPtr: &nonSnapshotPtrVal,
+			SnapshotStr:    snapshotVal,
+			SnapshotStrPtr: &snapshotPtrVal,
 		}
 
 		list := &TestStructList{
 			Data: []*TestStruct{tStruct},
 		}
 
-		err := redact.Redact(list)
+		err := redact.Snapshot(list)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, nonSecretVal, list.Data[0].NonSecret, "should contain non secret value")
-		assert.Equal(t, redact.RedactStrConst, list.Data[0].Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *list.Data[0].SecretPtr, "should redact secret value")
+		assert.Equal(t, snapshotVal, list.Data[0].SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, snapshotPtrVal, *list.Data[0].SnapshotStrPtr, "should contain snapshot value")
+		assert.Equal(t, redact.RedactStrConst, list.Data[0].NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *list.Data[0].NonSnapshotPtr, "should redact non snapshot value")
 	})
 
 	t.Run("Should still redact empty strings", func(t *testing.T) {
 		emptyStrVal := ""
 
 		tStruct := &TestStruct{
-			NonSecret: nonSecretVal,
-			Secret:    "",
-			SecretPtr: &emptyStrVal,
+			NonSnapshot:    "",
+			NonSnapshotPtr: &emptyStrVal,
+			SnapshotStr:    snapshotVal,
 		}
 
 		list := &TestStructList{
 			Data: []*TestStruct{tStruct},
 		}
 
-		err := redact.Redact(list)
+		err := redact.Snapshot(list)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, nonSecretVal, list.Data[0].NonSecret, "should contain non secret value")
-		assert.Equal(t, redact.RedactStrConst, list.Data[0].Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *list.Data[0].SecretPtr, "should redact secret value")
+		assert.Equal(t, snapshotVal, list.Data[0].SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, redact.RedactStrConst, list.Data[0].NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *list.Data[0].NonSnapshotPtr, "should redact non snapshot value")
 	})
 
 }
 
 func TestStringTestMapAndEmbedded(t *testing.T) {
-	t.Run("Should Redact Map And Slice Structs", func(t *testing.T) {
+	t.Run("Should Redact Map Structs", func(t *testing.T) {
 		tMaps := &TestMaps{
-			Secrets: map[string]string{
-				"secret-key-old": secretVal,
-				"secret-key-new": secretVal,
+			NonSnapshotMap: map[string]string{
+				"secret-key-old": nonSnapshotVal,
+				"secret-key-new": nonSnapshotVal,
 			},
-			SecretPtrs: map[string]*string{
-				"ptr-secret-key": &secretPtrVal,
+			NonSnapshotMapPtr: map[string]*string{
+				"ptr-secret-key": &nonSnapshotPtrVal,
 			},
-			TestStructSecrets: map[string]*TestStruct{
+			TestStructs: map[string]*TestStruct{
 				"ptr-test-struct-key": {
-					NonSecret: nonSecretVal,
-					Secret:    secretVal,
-					SecretPtr: &secretPtrVal,
+					NonSnapshot:    nonSnapshotVal,
+					NonSnapshotPtr: &nonSnapshotPtrVal,
+					SnapshotStr:    snapshotVal,
+					SnapshotStrPtr: &snapshotPtrVal,
 				},
 			},
 		}
 
-		err := redact.Redact(tMaps)
+		err := redact.Snapshot(tMaps)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, redact.RedactStrConst, tMaps.Secrets["secret-key-old"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, tMaps.Secrets["secret-key-new"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *tMaps.SecretPtrs["ptr-secret-key"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, tMaps.TestStructSecrets["ptr-test-struct-key"].Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *tMaps.TestStructSecrets["ptr-test-struct-key"].SecretPtr, "should redact secret value")
-		assert.Equal(t, nonSecretVal, tMaps.TestStructSecrets["ptr-test-struct-key"].NonSecret, "should redact secret value")
+		assert.Equal(t, redact.RedactStrConst, tMaps.NonSnapshotMap["secret-key-old"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, tMaps.NonSnapshotMap["secret-key-new"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *tMaps.NonSnapshotMapPtr["ptr-secret-key"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, tMaps.TestStructs["ptr-test-struct-key"].NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *tMaps.TestStructs["ptr-test-struct-key"].NonSnapshotPtr, "should redact non snapshot value")
+		assert.Equal(t, snapshotVal, tMaps.TestStructs["ptr-test-struct-key"].SnapshotStr, "should contain snapshot value")
+		assert.Equal(t, snapshotPtrVal, *tMaps.TestStructs["ptr-test-struct-key"].SnapshotStrPtr, "should contain snapshot value")
 	})
 
 	t.Run("Should Redact Map And Slice Structs", func(t *testing.T) {
 		tMaps := &TestMaps{
-			Secrets: map[string]string{
-				"secret-key-old": secretVal,
-				"secret-key-new": secretVal,
+			NonSnapshotMap: map[string]string{
+				"secret-key-old": nonSnapshotVal,
+				"secret-key-new": nonSnapshotVal,
 			},
-			SecretPtrs: map[string]*string{
-				"ptr-secret-key": &secretPtrVal,
+			NonSnapshotMapPtr: map[string]*string{
+				"ptr-secret-key": &nonSnapshotPtrVal,
 			},
-			TestStructSecrets: map[string]*TestStruct{
+			TestStructs: map[string]*TestStruct{
 				"ptr-test-struct-key": {
-					NonSecret: nonSecretVal,
-					Secret:    secretVal,
-					SecretPtr: &secretPtrVal,
+					NonSnapshot:    nonSnapshotVal,
+					NonSnapshotPtr: &nonSnapshotPtrVal,
+					SnapshotStr:    snapshotVal,
 				},
 			},
 		}
@@ -166,14 +174,14 @@ func TestStringTestMapAndEmbedded(t *testing.T) {
 			Data: []*TestMaps{tMaps},
 		}
 
-		err := redact.Redact(testMapList)
+		err := redact.Snapshot(testMapList)
 		assert.NoError(t, err, "should not fail to redact struct")
 
-		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].Secrets["secret-key-old"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].Secrets["secret-key-new"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *testMapList.Data[0].SecretPtrs["ptr-secret-key"], "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].TestStructSecrets["ptr-test-struct-key"].Secret, "should redact secret value")
-		assert.Equal(t, redact.RedactStrConst, *testMapList.Data[0].TestStructSecrets["ptr-test-struct-key"].SecretPtr, "should redact secret value")
-		assert.Equal(t, nonSecretVal, testMapList.Data[0].TestStructSecrets["ptr-test-struct-key"].NonSecret, "should redact secret value")
+		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].NonSnapshotMap["secret-key-old"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].NonSnapshotMap["secret-key-new"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *testMapList.Data[0].NonSnapshotMapPtr["ptr-secret-key"], "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, testMapList.Data[0].TestStructs["ptr-test-struct-key"].NonSnapshot, "should redact non snapshot value")
+		assert.Equal(t, redact.RedactStrConst, *testMapList.Data[0].TestStructs["ptr-test-struct-key"].NonSnapshotPtr, "should redact non snapshot value")
+		assert.Equal(t, snapshotVal, testMapList.Data[0].TestStructs["ptr-test-struct-key"].SnapshotStr, "should redact non snapshot value")
 	})
 }

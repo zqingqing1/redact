@@ -7,20 +7,15 @@ import (
 
 const (
 	tagName        = "redact"
-	RedactStrConst = "REDACTED"
+	RedactStrConst = "NONSNAPSHOT"
 )
 
 type redactor func(string) string
 
 var redactors = map[string]redactor{}
 
-// AddRedactor allows for adding custom functionality based on tag values
-func AddRedactor(key string, r redactor) {
-	redactors[key] = r
-}
-
-// Redact redacts all strings without the nonsecret tag
-func Redact(iface interface{}) error {
+// Snapshot redacts all strings without the "snapshot" tag
+func Snapshot(iface interface{}) error {
 	ifv := reflect.ValueOf(iface)
 	if ifv.Kind() != reflect.Ptr {
 		return errors.New("Not a pointer")
@@ -36,7 +31,7 @@ func Redact(iface interface{}) error {
 		switch el.Kind() {
 		case reflect.Struct:
 			if el.CanAddr() && el.Addr().CanInterface() {
-				Redact(el.Addr().Interface())
+				Snapshot(el.Addr().Interface())
 			}
 		case reflect.String:
 			if el.CanSet() {
@@ -47,7 +42,7 @@ func Redact(iface interface{}) error {
 		default:
 			tagVal := v.Tag.Get(tagName)
 			if el.CanAddr() && el.Addr().CanInterface() {
-				redactHelper(el.Addr().Interface(), tagVal)
+				snapshotHelper(el.Addr().Interface(), tagVal)
 			}
 
 		}
@@ -55,7 +50,7 @@ func Redact(iface interface{}) error {
 	return nil
 }
 
-func redactHelper(iface interface{}, tagVal string) error {
+func snapshotHelper(iface interface{}, tagVal string) error {
 	ifv := reflect.ValueOf(iface)
 	if ifv.Kind() != reflect.Ptr {
 		return errors.New("Not a pointer")
@@ -81,7 +76,7 @@ func redactHelper(iface interface{}, tagVal string) error {
 					if elVal.Kind() != reflect.Ptr {
 						elVal = elVal.Addr()
 					}
-					redactHelper(elVal.Interface(), tagVal)
+					snapshotHelper(elVal.Interface(), tagVal)
 				}
 			}
 		}
@@ -93,14 +88,14 @@ func redactHelper(iface interface{}, tagVal string) error {
 				mapValuePtr := reflect.New(mapValue.Type())
 				mapValuePtr.Elem().Set(mapValue)
 				if mapValuePtr.Elem().CanAddr() {
-					redactHelper(mapValuePtr.Elem().Addr().Interface(), tagVal)
+					snapshotHelper(mapValuePtr.Elem().Addr().Interface(), tagVal)
 				}
 				val.SetMapIndex(key, reflect.Indirect(mapValuePtr))
 			}
 		}
 	case reflect.Struct:
 		if ifIndirectValue.CanAddr() && ifIndirectValue.Addr().CanInterface() {
-			Redact(ifIndirectValue.Addr().Interface())
+			Snapshot(ifIndirectValue.Addr().Interface())
 		}
 	case reflect.String:
 		if ifIndirectValue.CanSet() {
@@ -109,7 +104,7 @@ func redactHelper(iface interface{}, tagVal string) error {
 		}
 	case reflect.Ptr:
 		if ifIndirectValue.CanInterface() {
-			redactHelper(ifIndirectValue.Interface(), tagVal)
+			snapshotHelper(ifIndirectValue.Interface(), tagVal)
 		}
 	}
 	return nil
@@ -152,7 +147,7 @@ func transformValue(tags string, val reflect.Value) reflect.Value {
 
 func transformString(input, tagVal string) string {
 	switch tagVal {
-	case "nonsecret":
+	case "snapshot":
 		return input
 	default:
 		redactor, ok := redactors[tagVal]
